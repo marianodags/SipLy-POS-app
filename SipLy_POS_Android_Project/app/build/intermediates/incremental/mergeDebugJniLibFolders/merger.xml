@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\Users\MARIANO\Downloads\SipLy_POS_Android_App_Project-2\SipLy_POS_Android_Project\app\src\main\jniLibs"/></dataSet><dataSet config="debug" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\Users\MARIANO\Downloads\SipLy_POS_Android_App_Project-2\SipLy_POS_Android_Project\app\src\debug\jniLibs"/></dataSet></merger>

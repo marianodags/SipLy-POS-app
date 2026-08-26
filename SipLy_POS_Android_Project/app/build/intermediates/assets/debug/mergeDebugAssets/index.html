@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SipLy POS</title>
+  <style>
+    :root{--green:#718d67;--green-dark:#536b4b;--light:#f7f5ee;--dark:#2b211c;--red:#d94d55;--orange:#e58b22;--border:#ddd;--muted:#777}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,sans-serif;background:var(--light);color:var(--dark)}
+    header{background:var(--green);color:#fff;text-align:center;padding:18px}
+    header h1{margin:0;font-size:28px} header p{margin:5px 0 0}
+    nav{display:flex;background:#fff;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:10;overflow-x:auto}
+    nav button{flex:1;padding:14px 8px;border:0;background:#fff;font-weight:bold;cursor:pointer;white-space:nowrap}
+    nav button.active{color:var(--green);border-bottom:4px solid var(--green)}
+    main{padding:16px;max-width:1250px;margin:auto}
+    .section-title{font-size:22px;margin:8px 0 12px}
+    .promo{background:#fff0ef;border:3px solid var(--red);border-radius:18px;padding:16px;margin-bottom:18px}
+    .promo h2{margin:0;color:var(--red)} .promo .big{font-size:30px;font-weight:900;margin:6px 0}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+    .card{background:#fff;border:1px solid var(--border);border-radius:15px;padding:16px;box-shadow:0 2px 5px #00000012}
+    .card h3{margin:0 0 8px}.price{color:var(--green);font-size:20px;font-weight:800}
+    button,.btn{border:0;border-radius:10px;padding:11px 14px;font-weight:bold;cursor:pointer}
+    .card .add-btn{width:100%;margin-top:12px;background:var(--green);color:#fff}
+    .btn-success{background:var(--green);color:#fff}.btn-danger{background:var(--red);color:#fff}
+    .btn-secondary{background:#777;color:#fff}.btn-warning{background:var(--orange);color:#fff}
+    .badge,.status{display:inline-block;padding:5px 9px;border-radius:10px;font-size:12px;font-weight:bold}
+    .badge{background:#e8efdf;color:#496341}.status-preparing{background:#fff0c7;color:#8a6500}
+    .status-ready{background:#dcefd8;color:#3d6b37}.status-received{background:#dce8f7;color:#315d8a}
+    .status-voided{background:#ffe0e0;color:#a32929}
+    .order-layout{display:grid;grid-template-columns:1.7fr 1fr;gap:16px}.cart{position:sticky;top:70px}
+    .cart-item{display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid #eee;padding:10px 0}
+    .qty-controls{display:flex;align-items:center;gap:6px}.qty-controls button{width:30px;height:30px;padding:0;background:#eee}
+    .total-box{margin-top:15px;padding:15px;background:#f2f5ed;border-radius:12px}
+    .total-line{display:flex;justify-content:space-between;gap:10px;margin:7px 0}.grand-total{font-size:23px;font-weight:bold;color:var(--green-dark)}
+    .form-input{width:100%;padding:11px;border:1px solid #ccc;border-radius:9px;font-size:15px}
+    .payment{margin-top:15px}.payment-row{margin-top:10px}
+    .order-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+    .empty{padding:35px;text-align:center;color:#777;background:#fff;border-radius:14px}
+    .table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;background:#fff}
+    th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left;vertical-align:middle}
+    .modal{display:none;position:fixed;inset:0;background:#0008;z-index:100;align-items:center;justify-content:center;padding:15px}
+    .modal-content{background:#fff;width:100%;max-width:480px;border-radius:16px;padding:20px}
+    .modal-content h2{margin-top:0}.modal-buttons{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+    .notice{padding:12px;background:#f5f5f5;border-radius:10px;margin-bottom:12px;font-size:14px}
+    .inventory-toolbar{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:15px}
+    .low-stock{color:var(--red);font-weight:bold}
+    .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:22px}
+    .stat-card{background:#fff;border:1px solid var(--border);border-radius:15px;padding:16px;box-shadow:0 2px 5px #00000012}
+    .stat-card .label{font-size:13px;color:var(--muted);font-weight:bold;text-transform:uppercase;letter-spacing:.3px}
+    .stat-card .value{font-size:24px;font-weight:900;color:var(--green-dark);margin-top:6px}
+    .stat-card.danger .value{color:var(--red)}
+    .sales-block{margin-bottom:26px}
+    table.sales-table th{background:#f2f5ed;color:var(--green-dark)}
+    table.sales-table td.num,table.sales-table th.num{text-align:right}
+    @media(max-width:800px){.order-layout{grid-template-columns:1fr}.cart{position:static}.inventory-toolbar{grid-template-columns:1fr}}
+  
+    .tracker-section{margin-bottom:26px}.tracker-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .mini-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+    .mini-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px}
+    .mini-card .big{font-size:22px;font-weight:900;color:var(--green-dark)}
+    .expense-form{display:grid;grid-template-columns:1.5fr 1fr auto;gap:8px;margin-bottom:12px}
+    @media(max-width:600px){.expense-form{grid-template-columns:1fr}}
+    .file-input{display:none}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🥤 SipLy POS</h1>
+  <p>Order • Record • Track Sales</p>
+</header>
+
+<nav>
+  <button id="tabOrder" class="active" onclick="showTab('order')">🛒 New Order</button>
+  <button id="tabSales" onclick="showTab('sales')">📊 Sales</button>
+  <button id="tabHistory" onclick="showTab('history')">📋 Order History</button>
+  <button id="tabInventory" onclick="showTab('inventory')">📦 Inventory</button>
+  <button id="tabExpenses" onclick="showTab('expenses')">💸 Expenses</button>
+  <button id="tabBackup" onclick="showTab('backup')">💾 Backup</button>
+</nav>
+
+<main>
+  <section id="order">
+    <div class="promo">
+      <h2>🎉 LAUNCH PROMO</h2>
+      <div class="big">BUY 2, TAKE 1 FREE!</div>
+      <span class="badge">12oz MILK TEA ONLY</span>
+      <p><b>Only ₱98</b> • Save ₱49</p>
+      <p>Promo valid for 12oz Milk Tea only. Not valid with other promos.</p>
+      <button class="btn btn-danger" style="width:100%;margin-top:10px;font-size:16px" onclick="addLaunchPromo()">🎁 AVAIL PROMO — ₱98</button>
+    </div>
+
+    <div class="order-layout">
+      <div>
+        <h2 class="section-title">🥤 Products</h2>
+        <div id="posProducts" class="grid"></div>
+      </div>
+
+      <div class="card cart">
+        <h2 class="section-title">🛒 Current Order</h2>
+        <div id="cartBox"></div>
+
+        <div class="total-box">
+          <div class="total-line"><span>Subtotal</span><b id="subtotal">₱0.00</b></div>
+          <div class="total-line"><span>Items</span><b id="itemCount">0</b></div>
+          <hr>
+          <div class="total-line grand-total"><span>TOTAL</span><span id="grandTotal">₱0.00</span></div>
+        </div>
+
+        <div class="payment">
+          <label><b>Payment Method</b></label>
+          <select id="paymentMethod" class="form-input" onchange="updatePaymentFields()">
+            <option value="CASH">Cash</option>
+            <option value="GCASH">GCash</option>
+          </select>
+
+          <div id="cashPayment" class="payment-row">
+            <label>Cash Received</label>
+            <input type="number" id="cashReceived" class="form-input" min="0" step="0.01" placeholder="₱0.00" oninput="calculateChange()">
+            <div class="notice">Change: <b id="changeAmount">₱0.00</b></div>
+          </div>
+
+          <div id="gcashPayment" class="payment-row" style="display:none">
+            <label>GCash Reference Number</label>
+            <input type="text" id="gcashReference" class="form-input" placeholder="Optional reference number">
+          </div>
+        </div>
+
+        <div class="order-actions">
+          <button class="btn btn-secondary" onclick="clearCart()">CLEAR</button>
+          <button class="btn btn-success" onclick="confirmOrder()">CONFIRM ORDER</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="sales" style="display:none">
+    <h2 class="section-title">📊 Daily &amp; Monthly Sales</h2>
+
+    <div class="sales-block">
+      <h3 style="margin:0 0 10px">Today</h3>
+      <div class="stat-grid" id="todayStats"></div>
+    </div>
+
+    <div class="sales-block">
+      <h3 style="margin:0 0 10px">Daily Sales</h3>
+      <div class="table-wrap">
+        <table class="sales-table">
+          <thead><tr><th>Date</th><th class="num">Transactions</th><th class="num">Cash Txns</th><th class="num">GCash Txns</th><th class="num">Total Sales</th><th class="num">Expenses</th><th class="num">Net Sales</th></tr></thead>
+          <tbody id="dailySalesBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sales-block">
+      <h3 style="margin:0 0 10px">Monthly Sales</h3>
+      <div class="table-wrap">
+        <table class="sales-table">
+          <thead><tr><th>Month</th><th class="num">Transactions</th><th class="num">Cash Txns</th><th class="num">GCash Txns</th><th class="num">Total Sales</th></tr></thead>
+          <tbody id="monthlySalesBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="history" style="display:none">
+    <h2 class="section-title">📋 Order History</h2>
+    <div id="historyBox"></div>
+  </section>
+
+  <section id="inventory" style="display:none">
+    <div class="inventory-toolbar">
+      <input id="inventorySearch" class="form-input" placeholder="🔍 Search product or category..." oninput="renderInventory()">
+      <button class="btn btn-success" onclick="openProductModal()">➕ ADD PRODUCT</button>
+    </div>
+    <div id="inventoryBox"></div>
+  </section>
+
+  <section id="expenses" style="display:none">
+    <h2 class="section-title">💸 Expenses Tracker</h2>
+    <div class="card tracker-section">
+      <div class="expense-form">
+        <input id="expenseDescription" class="form-input" placeholder="Expense description">
+        <input id="expenseAmount" type="number" class="form-input" min="0" step="0.01" placeholder="Amount">
+        <button class="btn btn-danger" onclick="addExpense()">ADD EXPENSE</button>
+      </div>
+      <div id="expenseSummary"></div>
+    </div>
+  </section>
+
+  <section id="backup" style="display:none">
+    <h2 class="section-title">💾 Excel Backup & Restore</h2>
+    <div class="card">
+      <p class="notice">Export creates an Excel-compatible <b>.xls</b> backup containing products, orders, expenses, cup purchases, and tracked product purchases. On Android, use the file picker to save or restore the backup.</p>
+      <div class="tracker-actions">
+        <button class="btn btn-success" onclick="exportExcelBackup()">⬇️ EXPORT EXCEL BACKUP</button>
+        <label class="btn btn-secondary" for="backupFile">⬆️ IMPORT / RESTORE EXCEL</label>
+        <input id="backupFile" class="file-input" type="file" accept=".xls,.xml" onchange="importExcelBackup(event)">
+      </div>
+      <div id="backupStatus" class="notice">No backup imported.</div>
+    </div>
+  </section>
+</main>
+
+<div id="productModal" class="modal">
+  <div class="modal-content">
+    <h2 id="productModalTitle">➕ Add Product</h2>
+    <input type="hidden" id="productId">
+    <label><b>Product Name</b></label>
+    <input id="productName" class="form-input" placeholder="e.g. Wintermelon Milk Tea">
+    <br><br>
+    <label><b>Category</b></label>
+    <input id="productCategory" class="form-input" list="categoryList" placeholder="e.g. Milk Tea">
+    <datalist id="categoryList">
+      <option value="Milk Tea"><option value="Side Dish"><option value="Combo"><option value="Drinks"><option value="Other">
+    </datalist>
+    <br><br>
+    <label><b>Selling Price</b></label>
+    <input type="number" id="productPrice" class="form-input" min="0" step="0.01" placeholder="0.00">
+    <br><br>
+    <label><b>Stock Quantity</b></label>
+    <input type="number" id="productStock" class="form-input" min="0" step="1" placeholder="0">
+    <div class="modal-buttons">
+      <button class="btn btn-secondary" onclick="closeProductModal()">CANCEL</button>
+      <button class="btn btn-success" onclick="saveProduct()">SAVE PRODUCT</button>
+    </div>
+  </div>
+</div>
+
+<div id="voidModal" class="modal">
+  <div class="modal-content">
+    <h2>⚠️ Void Order</h2>
+    <p id="voidOrderInfo"></p>
+    <label><b>Void Reason *</b></label>
+    <textarea id="voidReason" class="form-input" rows="4" placeholder="Enter reason for voiding this order..."></textarea>
+    <div class="modal-buttons">
+      <button class="btn btn-secondary" onclick="closeVoidModal()">CANCEL</button>
+      <button class="btn btn-danger" onclick="confirmVoid()">VOID ORDER</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const PRODUCTS_KEY="siply_products_v5";
+  const ORDERS_KEY="siply_orders_v5";
+  const EXPENSES_KEY="siply_expenses_v1";
+  const CUPS_KEY="siply_cups_v1";
+  const PURCHASES_KEY="siply_purchases_v1";
+  let cart=[];
+  let selectedVoidOrderId=null;
+
+  const defaultProducts=[
+  {id:1,name:"12oz Milk Tea",category:"Milk Tea",price:49,stock:100},
+  {id:2,name:"16oz Milk Tea",category:"Milk Tea",price:59,stock:100},
+  {id:3,name:"22oz Milk Tea",category:"Milk Tea",price:69,stock:100},
+  {id:4,name:"Tornado Fries",category:"Side Dish",price:40,stock:100},
+  {id:5,name:"Fresh Fries",category:"Side Dish",price:50,stock:100},
+  {id:6,name:"Shawarma Wrap",category:"Side Dish",price:50,stock:100},
+  {id:7,name:"Nachos",category:"Side Dish",price:70,stock:100},
+  {id:8,name:"Sip & Snack",category:"Combo",price:79,stock:100},
+  {id:9,name:"Sip & Bite",category:"Combo",price:89,stock:100},
+  {id:10,name:"Sip & Crunch",category:"Combo",price:109,stock:100}
+  ];
+
+  function getProducts(){let p=JSON.parse(localStorage.getItem(PRODUCTS_KEY));if(!p){p=defaultProducts;saveProducts(p);}return p;}
+  function saveProducts(p){localStorage.setItem(PRODUCTS_KEY,JSON.stringify(p));}
+  function getOrders(){return JSON.parse(localStorage.getItem(ORDERS_KEY)||"[]");}
+  function saveOrders(o){localStorage.setItem(ORDERS_KEY,JSON.stringify(o));}
+  function getExpenses(){return JSON.parse(localStorage.getItem(EXPENSES_KEY)||"[]");}
+  function saveExpenses(x){localStorage.setItem(EXPENSES_KEY,JSON.stringify(x));}
+  function getCups(){return JSON.parse(localStorage.getItem(CUPS_KEY)||'{"12oz":{"bought":0},"16oz":{"bought":0},"22oz":{"bought":0}}');}
+  function saveCups(x){localStorage.setItem(CUPS_KEY,JSON.stringify(x));}
+  function getPurchases(){return JSON.parse(localStorage.getItem(PURCHASES_KEY)||'{}');}
+  function savePurchases(x){localStorage.setItem(PURCHASES_KEY,JSON.stringify(x));}
+  function isActiveOrder(o){return o.status!=="VOIDED";}
+  function money(n){return "₱"+Number(n).toFixed(2);}
+  function escapeHtml(v){return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}
+
+  function renderPOS(){
+  const box=document.getElementById("posProducts"),products=getProducts();
+  if(!products.length){box.innerHTML='<div class="empty">No products available. Add products in Inventory.</div>';return;}
+  box.innerHTML=products.map(p=>`
+  <div class="card">
+  <h3>${escapeHtml(p.name)}</h3>
+  <span class="badge">${escapeHtml(p.category)}</span>
+  ${needsFlavor(p)?`<div style="margin-top:10px"><label><b>Flavor</b></label><select id="flavor_${p.id}" class="form-input">${getFlavors(p).map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("")}</select></div>`:""}
+  <p class="${p.stock<=5?'low-stock':''}">Stock: ${p.stock}</p>
+  <div class="price">${money(p.price)}</div>
+  <button class="add-btn" onclick="addProductToCart(${p.id})" ${p.stock<=0?'disabled':''}>${p.stock<=0?'OUT OF STOCK':'ADD ORDER'}</button>
+  </div>`).join("");
+  }
+  function needsFlavor(product){return product.category==="Milk Tea"||product.name.toLowerCase().includes("milk tea")||product.name.toLowerCase().includes("fries");}
+  function getFlavors(product){
+  if(product.category==="Milk Tea"||product.name.toLowerCase().includes("milk tea"))return["Strawberry","Cookies & Cream","Matcha","Milk Chocolate","Red Velvet","Salted Caramel","Java Chips"];
+  if(product.name.toLowerCase().includes("fries"))return["Sour Cream","Cheese","BBQ"];
+  return[];
+  }
+  function addProductToCart(productId){
+  const product=getProducts().find(x=>x.id===productId);if(!product)return;
+  let flavor="";if(needsFlavor(product)){const select=document.getElementById("flavor_"+product.id);flavor=select?select.value:"";}
+  addToCart(productId,flavor);
+  }
+  function addToCart(productId,flavor=""){
+  const p=getProducts().find(x=>x.id===productId);if(!p)return;
+  const displayName=flavor?`${p.name} – ${flavor}`:p.name;
+  const existing=cart.find(x=>x.productId===productId&&x.flavor===flavor);
+  const qty=existing?existing.quantity:0;
+  if(qty>=p.stock){alert("Not enough stock for "+displayName+".");return;}
+  if(existing)existing.quantity++;
+  else cart.push({productId:p.id,name:displayName,productName:p.name,flavor:flavor,price:p.price,quantity:1});
+  renderCart();
+  }
+
+  function addLaunchPromo(){
+  const product=getProducts().find(x=>x.id===1);
+  if(!product){alert("12oz Milk Tea product was not found.");return;}
+  if(product.stock<3){alert("Not enough 12oz Milk Tea stock.\n\nThe promo requires 3 cups.");return;}
+  const existing=cart.find(x=>x.promo==="LAUNCH_PROMO");
+  if(existing){
+  if((existing.quantity+1)*3>product.stock){alert("Not enough stock for another promo.");return;}
+  existing.quantity++;
+  }else{
+  cart.push({productId:product.id,name:"LAUNCH PROMO – Buy 2 Take 1 Free",productName:product.name,flavor:"Promo",price:98,quantity:1,promo:"LAUNCH_PROMO",stockRequired:3});
+  }
+  renderCart();
+  }
+
+  function increaseQty(i){
+  const item=cart[i],p=getProducts().find(x=>x.id===item.productId);if(!p)return;
+  const required=item.promo==="LAUNCH_PROMO"?(item.quantity+1)*3:item.quantity+1;
+  if(required>p.stock){alert("Not enough stock.");return;}
+  item.quantity++;renderCart();
+  }
+  function decreaseQty(i){cart[i].quantity--;if(cart[i].quantity<=0)cart.splice(i,1);renderCart();}
+  function removeFromCart(i){cart.splice(i,1);renderCart();}
+  function clearCart(){if(cart.length&&confirm("Clear the current order?")){cart=[];renderCart();}}
+  function getCartTotal(){return cart.reduce((s,x)=>s+x.price*x.quantity,0);}
+  function getCartItemCount(){return cart.reduce((s,x)=>s+x.quantity,0);}
+  function renderCart(){
+  const box=document.getElementById("cartBox");
+  if(!cart.length)box.innerHTML='<div class="empty">No products in the order.<br><br>Add products from the menu.</div>';
+  else box.innerHTML=cart.map((x,i)=>`<div class="cart-item"><div><b>${escapeHtml(x.name)}</b><br><small>${money(x.price)} × ${x.quantity}</small></div><div><div class="qty-controls"><button onclick="decreaseQty(${i})">−</button><b>${x.quantity}</b><button onclick="increaseQty(${i})">+</button></div><small>${money(x.price*x.quantity)}</small></div></div>`).join("");
+  const total=getCartTotal();document.getElementById("subtotal").textContent=money(total);document.getElementById("grandTotal").textContent=money(total);document.getElementById("itemCount").textContent=getCartItemCount();calculateChange();
+  }
+  function updatePaymentFields(){
+  const m=document.getElementById("paymentMethod").value;
+  document.getElementById("cashPayment").style.display=m==="CASH"?"block":"none";
+  document.getElementById("gcashPayment").style.display=m==="GCASH"?"block":"none";
+  }
+  function calculateChange(){const total=getCartTotal(),cash=parseFloat(document.getElementById("cashReceived").value)||0;document.getElementById("changeAmount").textContent=money(Math.max(cash-total,0));}
+  function generateOrderNumber(){
+  const orders=getOrders();let max=0;
+  orders.forEach(o=>{const n=parseInt(String(o.orderNumber).replace(/\D/g,""))||0;if(n>max)max=n;});
+  return String(max+1).padStart(5,"0");
+  }
+
+  function confirmOrder(){
+  if(!cart.length){alert("Please add at least one product.");return;}
+  const total=getCartTotal(),method=document.getElementById("paymentMethod").value;
+  if(method==="CASH"){
+  const cash=parseFloat(document.getElementById("cashReceived").value)||0;
+  if(cash<total){alert("Insufficient cash payment.");return;}
+  }
+  const products=getProducts();
+  for(const item of cart){
+  const p=products.find(x=>x.id===item.productId);
+  const required=item.promo==="LAUNCH_PROMO"?item.quantity*3:item.quantity;
+  if(!p||p.stock<required){alert("Insufficient stock for "+item.name+".");return;}
+  }
+  if(!confirm("Confirm this order?\n\nTotal: "+money(total)+"\nPayment: "+method))return;
+
+  cart.forEach(item=>{
+  const p=products.find(x=>x.id===item.productId);
+  if(p)p.stock-=item.promo==="LAUNCH_PROMO"?item.quantity*3:item.quantity;
+  });
+  saveProducts(products);
+
+  const now=new Date().toLocaleString();
+  const order={id:Date.now(),orderNumber:generateOrderNumber(),items:JSON.parse(JSON.stringify(cart)),total,paymentMethod:method,cashReceived:method==="CASH"?(parseFloat(document.getElementById("cashReceived").value)||0):0,gcashReference:method==="GCASH"?document.getElementById("gcashReference").value.trim():"",status:"PREPARING",voidReason:"",createdAt:now,confirmedAt:now};
+  const orders=getOrders();orders.push(order);saveOrders(orders);
+
+  alert("ORDER CONFIRMED!\n\nOrder #: "+order.orderNumber+"\nTotal: "+money(total)+"\nStatus: PREPARING");
+  cart=[];document.getElementById("cashReceived").value="";document.getElementById("gcashReference").value="";
+  renderCart();renderPOS();renderInventory();renderSales();
+  }
+
+  function statusBadge(status){const cls={PREPARING:"status-preparing",READY:"status-ready",RECEIVED:"status-received",VOIDED:"status-voided"}[status]||"";return `<span class="status ${cls}">${status}</span>`;}
+  function markReady(id){const orders=getOrders(),o=orders.find(x=>x.id===id);if(!o||o.status!=="PREPARING"){alert("Only PREPARING orders can be marked READY.");return;}o.status="READY";saveOrders(orders);renderHistory();}
+  function markReceived(id){const orders=getOrders(),o=orders.find(x=>x.id===id);if(!o||o.status!=="READY"){alert("Only READY orders can be marked RECEIVED.");return;}o.status="RECEIVED";saveOrders(orders);renderHistory();}
+
+  function openVoidModal(id){
+  const o=getOrders().find(x=>x.id===id);if(!o)return;
+  selectedVoidOrderId=id;
+  document.getElementById("voidOrderInfo").innerHTML=`<b>Order #${o.orderNumber}</b><br>Total: ${money(o.total)}<br>Current Status: ${o.status}`;
+  document.getElementById("voidReason").value="";
+  document.getElementById("voidModal").style.display="flex";
+  }
+  function closeVoidModal(){selectedVoidOrderId=null;document.getElementById("voidModal").style.display="none";}
+  function confirmVoid(){
+  const reason=document.getElementById("voidReason").value.trim();
+  if(!reason){alert("Void reason is required.");return;}
+  if(!confirm("Are you sure you want to VOID this order?"))return;
+  const orders=getOrders(),o=orders.find(x=>x.id===selectedVoidOrderId);
+  if(!o||o.status==="VOIDED"){closeVoidModal();return;}
+  const products=getProducts();
+  o.items.forEach(item=>{
+  const p=products.find(x=>x.id===item.productId);
+  if(p)p.stock+=item.promo==="LAUNCH_PROMO"?item.quantity*3:item.quantity;
+  });
+  saveProducts(products);
+  o.status="VOIDED";o.voidReason=reason;o.voidedAt=new Date().toLocaleString();saveOrders(orders);
+  closeVoidModal();renderHistory();renderPOS();renderInventory();renderSales();
+  alert("Order #"+o.orderNumber+" has been VOIDED and stock was returned.");
+  }
+
+  function renderHistory(){
+  const box=document.getElementById("historyBox"),orders=getOrders().slice().reverse();
+  if(!orders.length){box.innerHTML='<div class="empty">No orders yet.</div>';return;}
+  box.innerHTML=orders.map(o=>`<div class="card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><h3>Order #${o.orderNumber}</h3><small>${escapeHtml(o.createdAt)}</small></div><div>${statusBadge(o.status)}</div></div><hr>
+  ${o.items.map(i=>`<div class="total-line"><span>${escapeHtml(i.name)} × ${i.quantity}</span><b>${money(i.price*i.quantity)}</b></div>`).join("")}
+  <hr><div class="total-line"><span>Payment</span><b>${escapeHtml(o.paymentMethod)}</b></div>
+  ${o.paymentMethod==="GCASH"&&o.gcashReference?`<div class="total-line"><span>GCash Ref.</span><b>${escapeHtml(o.gcashReference)}</b></div>`:""}
+  <div class="total-line grand-total"><span>TOTAL</span><span>${money(o.total)}</span></div>
+  ${o.voidReason?`<div class="notice"><b>Void Reason:</b><br>${escapeHtml(o.voidReason)}<br><small>Voided: ${escapeHtml(o.voidedAt||"")}</small></div>`:""}
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+  ${o.status==="PREPARING"?`<button class="btn btn-success" onclick="markReady(${o.id})">MARK READY</button>`:""}
+  ${o.status==="READY"?`<button class="btn btn-success" onclick="markReceived(${o.id})">MARK RECEIVED</button>`:""}
+  ${o.status!=="VOIDED"?`<button class="btn btn-danger" onclick="openVoidModal(${o.id})">VOID</button>`:""}
+  </div></div>`).join("");
+  }
+
+  /* ---------------- SALES DASHBOARD ---------------- */
+
+  // Orders are keyed by their creation time using o.id (Date.now()), which is
+  // timezone/locale-safe unlike parsing the display string in createdAt.
+  function orderDate(o){return new Date(o.id);}
+  function dayKey(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+  function monthKey(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
+  function dayLabel(d){return d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});}
+  function monthLabel(d){return d.toLocaleDateString(undefined,{month:"long",year:"numeric"});}
+
+  function computeSalesData(){
+  const orders=getOrders();
+  const today=new Date();
+  const todayKey=dayKey(today);
+
+  const dailyMap={};   // key -> {date, transactions, sales, items, cash, gcash, voidedCount, voidedAmount}
+  const monthlyMap={}; // key -> {date, transactions, sales, items, cash, gcash, voidedCount, voidedAmount}
+  const todayStats={transactions:0,sales:0,cash:0,gcash:0,cashCount:0,gcashCount:0,items:0,voidedCount:0,voidedAmount:0,expenses:0,netSales:0,cups:{"12oz":0,"16oz":0,"22oz":0},products:{}};
+  const expenseTotal=getExpenses().reduce((s,e)=>s+Number(e.amount||0),0);
+
+  function bucket(map,key,repDate){
+  if(!map[key])map[key]={date:repDate,transactions:0,sales:0,items:0,cash:0,gcash:0,cashCount:0,gcashCount:0,voidedCount:0,voidedAmount:0};
+  return map[key];
+  }
+
+  orders.forEach(o=>{
+  const d=orderDate(o);
+  const dKey=dayKey(d), mKey=monthKey(d);
+  const dayB=bucket(dailyMap,dKey,d), monB=bucket(monthlyMap,mKey,d);
+  const itemCount=o.items.reduce((s,i)=>s+i.quantity,0);
+  const isVoided=o.status==="VOIDED";
+
+  [dayB,monB].forEach(b=>{
+  if(isVoided){
+  b.voidedCount++;
+  b.voidedAmount+=o.total;
+  }else{
+  b.transactions++;
+  b.sales+=o.total;
+  b.items+=itemCount;
+  if(o.paymentMethod==="CASH"){b.cash+=o.total;b.cashCount=(b.cashCount||0)+1;}
+  else if(o.paymentMethod==="GCASH"){b.gcash+=o.total;b.gcashCount=(b.gcashCount||0)+1;}
+  }
+  });
+
+  if(dKey===todayKey){
+  if(isVoided){todayStats.voidedCount++;todayStats.voidedAmount+=o.total;}
+  else{
+  todayStats.transactions++;todayStats.sales+=o.total;todayStats.items+=itemCount;
+  if(o.paymentMethod==="CASH"){todayStats.cash+=o.total;todayStats.cashCount++;}
+  else if(o.paymentMethod==="GCASH"){todayStats.gcash+=o.total;todayStats.gcashCount++;}
+  }
+  }
+  });
+
+  todayStats.expenses=getExpenses().filter(e=>dayKey(new Date(e.createdAt||e.id))===todayKey).reduce((s,e)=>s+Number(e.amount||0),0);
+  todayStats.netSales=todayStats.sales-todayStats.expenses;
+  const daily=Object.values(dailyMap).sort((a,b)=>b.date-a.date);
+  daily.forEach(d=>{d.expenses=getExpenses().filter(e=>dayKey(new Date(e.createdAt||e.id))===dayKey(d.date)).reduce((s,e)=>s+Number(e.amount||0),0);d.netSales=d.sales-d.expenses;});
+  const monthly=Object.values(monthlyMap).sort((a,b)=>b.date-a.date);
+  monthly.forEach(m=>{m.expenses=getExpenses().filter(e=>monthKey(new Date(e.createdAt||e.id))===monthKey(m.date)).reduce((s,e)=>s+Number(e.amount||0),0);m.netSales=m.sales-m.expenses;});
+  return{todayStats,daily,monthly};
+  }
+
+  function renderSales(){
+  const{todayStats,daily,monthly}=computeSalesData();
+
+  const statCards=[
+  {label:"🧾 Total Transactions",value:todayStats.transactions,danger:false},
+  {label:"💰 Total Sales",value:money(todayStats.sales),danger:false},
+  {label:"🥤 Total Items Sold",value:todayStats.items,danger:false},
+  {label:"💵 Cash Sales",value:money(todayStats.cash),danger:false},
+  {label:"📱 GCash Sales",value:money(todayStats.gcash),danger:false},
+  {label:"📱 GCash Transactions",value:todayStats.gcashCount,danger:false},
+  {label:"💵 Cash Transactions",value:todayStats.cashCount,danger:false},
+  {label:"💸 Expenses",value:money(todayStats.expenses),danger:true},
+  {label:"💰 Net Sales",value:money(todayStats.netSales),danger:false},
+  {label:"❌ Voided Transactions",value:todayStats.voidedCount,danger:true},
+  {label:"💸 Voided Amount",value:money(todayStats.voidedAmount),danger:true}
+  ];
+  document.getElementById("todayStats").innerHTML=statCards.map(s=>`
+  <div class="stat-card${s.danger?' danger':''}"><div class="label">${s.label}</div><div class="value">${s.value}</div></div>
+  `).join("");
+
+  const dailyBody=document.getElementById("dailySalesBody");
+  dailyBody.innerHTML=daily.length?daily.map(d=>`<tr><td>${dayLabel(d.date)}</td><td class="num">${d.transactions}</td><td class="num">${d.cashCount||0}</td><td class="num">${d.gcashCount||0}</td><td class="num">${money(d.sales)}</td><td class="num">${money(d.expenses||0)}</td><td class="num">${money(d.netSales||d.sales)}</td></tr>`).join("")
+  :`<tr><td colspan="7" style="text-align:center;color:#777;padding:20px">No sales data yet.</td></tr>`;
+
+  const monthlyBody=document.getElementById("monthlySalesBody");
+  monthlyBody.innerHTML=monthly.length?monthly.map(m=>`<tr><td>${monthLabel(m.date)}</td><td class="num">${m.transactions}</td><td class="num">${m.cashCount||0}</td><td class="num">${m.gcashCount||0}</td><td class="num">${money(m.sales)}</td></tr>`).join("")
+  :`<tr><td colspan="5" style="text-align:center;color:#777;padding:20px">No sales data yet.</td></tr>`;
+  }
+
+  /* ---------------- INVENTORY ---------------- */
+
+  function renderInventory(){
+  const box=document.getElementById("inventoryBox"),q=(document.getElementById("inventorySearch")?.value||"").toLowerCase();
+  const products=getProducts().filter(p=>p.name.toLowerCase().includes(q)||p.category.toLowerCase().includes(q));
+  if(!products.length){box.innerHTML='<div class="empty">No products found.<br><br><button class="btn btn-success" onclick="openProductModal()">➕ ADD PRODUCT</button></div>';return;}
+  box.innerHTML=`<div class="grid">${products.map(p=>`<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><div><h3>${escapeHtml(p.name)}</h3><span class="badge">${escapeHtml(p.category)}</span></div>${p.stock<=5?'<span class="status status-voided">LOW STOCK</span>':""}</div><hr>
+  <div class="total-line"><span>Price</span><b>${money(p.price)}</b></div><div class="total-line"><span>Stock</span><b class="${p.stock<=5?'low-stock':''}">${p.stock}</b></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px"><button class="btn btn-success" onclick="editProduct(${p.id})">✏️ EDIT</button><button class="btn btn-danger" onclick="deleteProduct(${p.id})">🗑️ DELETE</button></div></div>`).join("")}</div>
+  <div class="card tracker-section" style="margin-top:18px"><h3>🥤 Cup Summary Tracker</h3><div class="mini-grid">${["12oz","16oz","22oz"].map(size=>{const c=getCups()[size]||{bought:0};const used=getCupUsed(size);return `<div class="mini-card"><b>${size} Cups</b><div>Bought: <b>${c.bought||0}</b></div><div>Used: <b>${used}</b></div><div>Remaining: <b>${(c.bought||0)-used}</b></div><button class="btn btn-success" style="margin-top:8px;width:100%" onclick="editCupPurchase('${size}')">✏️ EDIT BOUGHT</button></div>`}).join("")}</div></div>
+  <div class="card tracker-section"><h3>🍟 Product Purchase / Usage Summary</h3><div class="mini-grid">${["Nachos","Fresh Fries","Shawarma Wrap","Tornado Fries"].map(name=>{const bought=getPurchases()[name]||0;const used=getProductUsed(name);return `<div class="mini-card"><b>${escapeHtml(name)}</b><div>Bought: <b>${bought}</b></div><div>Used/Sold: <b>${used}</b></div><div>Remaining: <b>${bought-used}</b></div><button class="btn btn-success" style="margin-top:8px;width:100%" onclick="editProductPurchase('${name.replace(/'/g,"\\'")}')">✏️ EDIT BOUGHT</button></div>`}).join("")}</div></div>`;
+  }
+  function openProductModal(){
+  document.getElementById("productModalTitle").textContent="➕ Add Product";document.getElementById("productId").value="";document.getElementById("productName").value="";document.getElementById("productCategory").value="Milk Tea";document.getElementById("productPrice").value="";document.getElementById("productStock").value="0";document.getElementById("productModal").style.display="flex";
+  }
+  function editProduct(id){
+  const p=getProducts().find(x=>x.id===id);if(!p)return;
+  document.getElementById("productModalTitle").textContent="✏️ Edit Product";document.getElementById("productId").value=p.id;document.getElementById("productName").value=p.name;document.getElementById("productCategory").value=p.category;document.getElementById("productPrice").value=p.price;document.getElementById("productStock").value=p.stock;document.getElementById("productModal").style.display="flex";
+  }
+  function closeProductModal(){document.getElementById("productModal").style.display="none";}
+  function saveProduct(){
+  const id=document.getElementById("productId").value,name=document.getElementById("productName").value.trim(),category=document.getElementById("productCategory").value.trim(),price=parseFloat(document.getElementById("productPrice").value),stock=parseInt(document.getElementById("productStock").value);
+  if(!name){alert("Product name is required.");return;}if(!category){alert("Category is required.");return;}if(isNaN(price)||price<0){alert("Please enter a valid price.");return;}if(isNaN(stock)||stock<0){alert("Please enter a valid stock quantity.");return;}
+  let products=getProducts();
+  if(id){
+  const p=products.find(x=>x.id===Number(id));if(!p){alert("Product not found.");return;}
+  p.name=name;p.category=category;p.price=price;p.stock=stock;saveProducts(products);closeProductModal();renderInventory();renderPOS();renderCart();alert("Product updated successfully.");return;
+  }
+  if(products.some(p=>p.name.toLowerCase()===name.toLowerCase())){alert("A product with this name already exists.");return;}
+  products.push({id:Date.now(),name,category,price,stock});saveProducts(products);closeProductModal();renderInventory();renderPOS();alert("Product added successfully and is now available in POS.");
+  }
+  function deleteProduct(id){
+  const products=getProducts(),p=products.find(x=>x.id===id);if(!p)return;const orders=getOrders();
+  const used=orders.some(o=>o.items.some(i=>i.productId===id));
+  if(used){alert("This product cannot be deleted because it already appears in order history.\n\nYou can edit its name, category, price, or stock instead.");return;}
+  if(!confirm("Delete "+p.name+"?"))return;
+  saveProducts(products.filter(x=>x.id!==id));renderInventory();renderPOS();renderCart();alert("Product deleted.");
+  }
+
+  function getCupUsed(size){
+    let used=0; getOrders().forEach(o=>{if(!isActiveOrder(o))return;o.items.forEach(i=>{const n=i.productName||i.name;const m=n.match(/^(12oz|16oz|22oz)/i);if(m&&m[1].toLowerCase()===size.toLowerCase())used+=i.promo==="LAUNCH_PROMO"?i.quantity*3:i.quantity;});});return used;
+  }
+  function getProductUsed(name){
+    let used=0;getOrders().forEach(o=>{if(!isActiveOrder(o))return;o.items.forEach(i=>{if((i.productName||"").toLowerCase()===name.toLowerCase())used+=i.quantity;});});return used;
+  }
+  function editCupPurchase(size){
+    const c=getCups();
+    c[size]=c[size]||{bought:0};
+    const current=Number(c[size].bought||0);
+    const input=prompt("Set the TOTAL number of "+size+" cups bought.\n\nCurrent Bought: "+current+"\n\nEnter the correct total quantity:",String(current));
+    if(input===null)return;
+    const n=parseInt(input,10);
+    if(!Number.isFinite(n)||n<0){alert("Please enter a valid quantity (0 or greater).");return;}
+    const used=getCupUsed(size);
+    if(n<used){
+      if(!confirm("The new Bought quantity ("+n+") is less than Used ("+used+").\n\nRemaining stock would be negative. Continue?"))return;
+    }
+    c[size].bought=n;
+    saveCups(c);
+    renderInventory();
+  }
+
+  function editProductPurchase(name){
+    const p=getPurchases();
+    const current=Number(p[name]||0);
+    const input=prompt("Set the TOTAL number of "+name+" bought.\n\nCurrent Bought: "+current+"\n\nEnter the correct total quantity:",String(current));
+    if(input===null)return;
+    const n=parseInt(input,10);
+    if(!Number.isFinite(n)||n<0){alert("Please enter a valid quantity (0 or greater).");return;}
+
+    const used=getProductUsed(name);
+    if(n<used){
+      if(!confirm("The new Bought quantity ("+n+") is less than Used/Sold ("+used+").\n\nRemaining stock would be negative. Continue?"))return;
+    }
+
+    const difference=n-current;
+    p[name]=n;
+    savePurchases(p);
+
+    const prod=getProducts().find(x=>x.name.toLowerCase()===name.toLowerCase());
+    if(prod){
+      prod.stock=Math.max(0,Number(prod.stock||0)+difference);
+      saveProducts(getProducts());
+    }
+
+    renderInventory();
+    renderPOS();
+  }
+
+  function addExpense(){
+    const description=document.getElementById("expenseDescription").value.trim(),amount=parseFloat(document.getElementById("expenseAmount").value);
+    if(!description){alert("Expense description is required.");return;}if(!Number.isFinite(amount)||amount<=0){alert("Enter a valid expense amount.");return;}
+    const e=getExpenses();e.push({id:Date.now(),description,amount,createdAt:new Date().toISOString()});saveExpenses(e);
+    document.getElementById("expenseDescription").value="";document.getElementById("expenseAmount").value="";renderExpenseSummary();renderSales();
+  }
+  function renderExpenseSummary(){
+    const e=getExpenses().slice().reverse(),total=e.reduce((s,x)=>s+Number(x.amount||0),0);
+    document.getElementById("expenseSummary").innerHTML=`<div class="stat-grid"><div class="stat-card danger"><div class="label">Total Expenses</div><div class="value">${money(total)}</div></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th><th></th></tr></thead><tbody>${e.length?e.map(x=>`<tr><td>${new Date(x.createdAt).toLocaleString()}</td><td>${escapeHtml(x.description)}</td><td class="num">${money(x.amount)}</td><td><button class="btn btn-danger" onclick="deleteExpense(${x.id})">DELETE</button></td></tr>`).join(""):'<tr><td colspan="4" style="text-align:center">No expenses recorded.</td></tr>'}</tbody></table></div>`;
+  }
+  function deleteExpense(id){if(!confirm("Delete this expense?"))return;saveExpenses(getExpenses().filter(x=>x.id!==id));renderExpenseSummary();renderSales();}
+
+  function xmlEsc(v){return escapeHtml(v).replace(/&#039;/g,"&apos;");}
+  function xmlCell(v){return `<Cell><Data ss:Type="${typeof v==="number"&&!isNaN(v)?"Number":"String"}">${xmlEsc(v==null?"":v)}</Data></Cell>`;}
+  function xmlRow(vals){return "<Row>"+vals.map(xmlCell).join("")+"</Row>";}
+  function xmlSheet(name,headers,rows){return `<Worksheet ss:Name="${xmlEsc(name)}"><Table>${xmlRow(headers)}${rows.map(r=>xmlRow(r)).join("")}</Table></Worksheet>`;}
+  function buildExcelBackup(){
+    const products=getProducts(),orders=getOrders(),expenses=getExpenses(),cups=getCups(),purchases=getPurchases();
+    return `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+    ${xmlSheet("Products",["id","name","category","price","stock"],products.map(p=>[p.id,p.name,p.category,p.price,p.stock]))}
+    ${xmlSheet("Orders",["id","orderNumber","total","paymentMethod","cashReceived","gcashReference","status","createdAt","voidReason","voidedAt"],orders.map(o=>[o.id,o.orderNumber,o.total,o.paymentMethod,o.cashReceived,o.gcashReference,o.status,o.createdAt,o.voidReason,o.voidedAt||""]))}
+    ${xmlSheet("OrderItems",["orderId","productId","productName","name","flavor","price","quantity","promo"],orders.flatMap(o=>o.items.map(i=>[o.id,i.productId,i.productName,i.name,i.flavor,i.price,i.quantity,i.promo||""])))}
+    ${xmlSheet("Expenses",["id","description","amount","createdAt"],expenses.map(e=>[e.id,e.description,e.amount,e.createdAt]))}
+    ${xmlSheet("Cups",["size","bought"],Object.entries(cups).map(([k,v])=>[k,v.bought||0]))}
+    ${xmlSheet("ProductPurchases",["product","bought"],Object.entries(purchases).map(([k,v])=>[k,v]))}
+    </Workbook>`;
+  }
+  function exportExcelBackup(){
+    const wb=buildExcelBackup();
+    const filename="SipLy_POS_Backup_"+new Date().toISOString().slice(0,10)+".xls";
+    if(window.AndroidBridge&&AndroidBridge.exportBackup){
+      AndroidBridge.exportBackup(wb,filename);
+      document.getElementById("backupStatus").textContent="Choose where to save the Excel backup.";
+      return;
+    }
+    const blob=new Blob([wb],{type:"application/vnd.ms-excel"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;a.click();URL.revokeObjectURL(a.href);
+    document.getElementById("backupStatus").textContent="Backup exported successfully.";
+  }
+  function importExcelBackup(event){
+    const file=event.target.files[0];if(!file)return;
+    if(window.AndroidBridge&&AndroidBridge.importBackup){AndroidBridge.importBackup();event.target.value="";return;}
+    const reader=new FileReader();reader.onload=()=>restoreExcelBackupText(reader.result);reader.readAsText(file);event.target.value="";
+  }
+  function restoreExcelBackupText(text){
+    try{
+      const doc=new DOMParser().parseFromString(text,"application/xml");if(doc.querySelector("parsererror"))throw new Error("Invalid Excel backup. Please use a SipLy POS .xls backup.");
+      const ns="urn:schemas-microsoft-com:office:spreadsheet", sheets=[...doc.getElementsByTagNameNS(ns,"Worksheet")];const data={};
+      sheets.forEach(ws=>{const name=ws.getAttributeNS(ns,"Name")||ws.getAttribute("ss:Name")||ws.getAttribute("Name");const rows=[...ws.getElementsByTagNameNS(ns,"Row")].map(r=>[...r.getElementsByTagNameNS(ns,"Data")].map(d=>d.textContent));data[name]=rows;});
+      const rowObjs=(name)=>{const rows=data[name]||[];if(!rows.length)return[];const h=rows[0];return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??""])));};
+      const products=rowObjs("Products").map(p=>({...p,id:Number(p.id),price:Number(p.price),stock:Number(p.stock)}));
+      const ordersRaw=rowObjs("Orders"),items=rowObjs("OrderItems");const orders=ordersRaw.map(o=>({...o,id:Number(o.id),total:Number(o.total),cashReceived:Number(o.cashReceived||0),items:items.filter(i=>Number(i.orderId)===Number(o.id)).map(i=>({...i,orderId:undefined,productId:Number(i.productId),price:Number(i.price),quantity:Number(i.quantity),promo:i.promo||undefined}))}));
+      const expenses=rowObjs("Expenses").map(e=>({...e,id:Number(e.id),amount:Number(e.amount)}));const cups={};rowObjs("Cups").forEach(x=>cups[x.size]={bought:Number(x.bought||0)});const purchases={};rowObjs("ProductPurchases").forEach(x=>purchases[x.product]=Number(x.bought||0));
+      if(!products.length&&!orders.length&&!expenses.length)throw new Error("Backup appears empty.");
+      if(!confirm("Restore this backup? Current POS data will be replaced."))return;
+      saveProducts(products);saveOrders(orders);saveExpenses(expenses);saveCups(cups);savePurchases(purchases);
+      renderPOS();renderCart();renderSales();renderHistory();renderInventory();renderExpenseSummary();document.getElementById("backupStatus").textContent="Backup restored successfully.";
+    }catch(err){alert("Restore failed: "+err.message);}
+  }
+  window.androidImportBackup=function(text){restoreExcelBackupText(text);};
+
+  function showTab(tab){
+  document.getElementById("order").style.display=tab==="order"?"block":"none";
+  document.getElementById("sales").style.display=tab==="sales"?"block":"none";
+  document.getElementById("history").style.display=tab==="history"?"block":"none";
+  document.getElementById("inventory").style.display=tab==="inventory"?"block":"none";
+  document.getElementById("expenses").style.display=tab==="expenses"?"block":"none";
+  document.getElementById("backup").style.display=tab==="backup"?"block":"none";
+  ["tabOrder","tabSales","tabHistory","tabInventory","tabExpenses","tabBackup"].forEach(id=>document.getElementById(id).classList.remove("active"));
+  document.getElementById("tab"+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add("active");
+  if(tab==="sales")renderSales();if(tab==="history")renderHistory();if(tab==="inventory")renderInventory();if(tab==="expenses")renderExpenseSummary();
+  }
+
+  getProducts();renderPOS();renderCart();renderSales();renderHistory();renderInventory();renderExpenseSummary();updatePaymentFields();
+</script>
+</body>
+</html>
