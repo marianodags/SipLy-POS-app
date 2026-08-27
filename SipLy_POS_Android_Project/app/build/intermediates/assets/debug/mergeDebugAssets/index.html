@@ -15,8 +15,6 @@
     nav button.active{color:var(--green);border-bottom:4px solid var(--green)}
     main{padding:16px;max-width:1250px;margin:auto}
     .section-title{font-size:22px;margin:8px 0 12px}
-    .promo{background:#fff0ef;border:3px solid var(--red);border-radius:18px;padding:16px;margin-bottom:18px}
-    .promo h2{margin:0;color:var(--red)} .promo .big{font-size:30px;font-weight:900;margin:6px 0}
     .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
     .card{background:#fff;border:1px solid var(--border);border-radius:15px;padding:16px;box-shadow:0 2px 5px #00000012}
     .card h3{margin:0 0 8px}.price{color:var(--green);font-size:20px;font-weight:800}
@@ -54,7 +52,7 @@
     table.sales-table th{background:#f2f5ed;color:var(--green-dark)}
     table.sales-table td.num,table.sales-table th.num{text-align:right}
     @media(max-width:800px){.order-layout{grid-template-columns:1fr}.cart{position:static}.inventory-toolbar{grid-template-columns:1fr}}
-  
+
     .tracker-section{margin-bottom:26px}.tracker-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
     .mini-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
     .mini-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px}
@@ -82,15 +80,6 @@
 
 <main>
   <section id="order">
-    <div class="promo">
-      <h2>🎉 LAUNCH PROMO</h2>
-      <div class="big">BUY 2, TAKE 1 FREE!</div>
-      <span class="badge">12oz MILK TEA ONLY</span>
-      <p><b>Only ₱98</b> • Save ₱49</p>
-      <p>Promo valid for 12oz Milk Tea only. Not valid with other promos.</p>
-      <button class="btn btn-danger" style="width:100%;margin-top:10px;font-size:16px" onclick="addLaunchPromo()">🎁 AVAIL PROMO — ₱98</button>
-    </div>
-
     <div class="order-layout">
       <div>
         <h2 class="section-title">🥤 Products</h2>
@@ -277,59 +266,172 @@
   function money(n){return "₱"+Number(n).toFixed(2);}
   function escapeHtml(v){return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}
 
+  function isCombo(p){
+    return p.category==="Combo"||isComboName(p.name);
+  }
+  function isComboName(name){
+    if(!name)return false;
+    const n=name.toLowerCase();
+    return n.includes("sip &")||n.includes("snack")||n.includes("bite")||n.includes("crunch");
+  }
+  function getComboComponents(p,sideChoice=""){
+    const name=(p.name||"").toLowerCase();
+    if(p.id===8||name.includes("snack")){
+      return [{productName:"12oz Milk Tea",qty:1},{productName:"Tornado Fries",qty:1}];
+    }
+    if(p.id===9||name.includes("bite")){
+      const side=(sideChoice||"Fresh Fries").trim();
+      return [{productName:"12oz Milk Tea",qty:1},{productName:side,qty:1}];
+    }
+    if(p.id===10||name.includes("crunch")){
+      return [{productName:"12oz Milk Tea",qty:1},{productName:"Nachos",qty:1}];
+    }
+    return [];
+  }
+
   function renderPOS(){
   const box=document.getElementById("posProducts"),products=getProducts();
   if(!products.length){box.innerHTML='<div class="empty">No products available. Add products in Inventory.</div>';return;}
-  box.innerHTML=products.map(p=>`
-  <div class="card">
-  <h3>${escapeHtml(p.name)}</h3>
-  <span class="badge">${escapeHtml(p.category)}</span>
-  ${needsFlavor(p)?`<div style="margin-top:10px"><label><b>Flavor</b></label><select id="flavor_${p.id}" class="form-input">${getFlavors(p).map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("")}</select></div>`:""}
-  <p class="${p.stock<=5?'low-stock':''}">Stock: ${p.stock}</p>
-  <div class="price">${money(p.price)}</div>
-  <button class="add-btn" onclick="addProductToCart(${p.id})" ${p.stock<=0?'disabled':''}>${p.stock<=0?'OUT OF STOCK':'ADD ORDER'}</button>
-  </div>`).join("");
+  box.innerHTML=products.map(p=>{
+    let customizationHtml="";
+    if(isCombo(p)){
+      const name=p.name.toLowerCase();
+      const milkTeaFlavors=getFlavors({category:"Milk Tea",name:"Milk Tea"});
+      let sideChoiceHtml="";
+      let friesFlavorHtml="";
+      if(p.id===9||name.includes("bite")){
+        sideChoiceHtml=`<div style="margin-top:8px"><label><b>Side Dish Option</b></label><select id="side_${p.id}" class="form-input" onchange="toggleComboFriesFlavor(${p.id})"><option value="Fresh Fries">Fresh Fries</option><option value="Shawarma Wrap">Shawarma Wrap</option></select></div>`;
+      }
+      if(p.id===8||name.includes("snack")||p.id===9||name.includes("bite")){
+        const friesFlavors=getFlavors({category:"Side Dish",name:"Fries"});
+        friesFlavorHtml=`<div id="sideFlavorBox_${p.id}" style="margin-top:8px"><label><b>Fries Flavor</b></label><select id="sideFlavor_${p.id}" class="form-input">${friesFlavors.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("")}</select></div>`;
+      }
+      customizationHtml=`<div style="margin-top:10px">
+        <label><b>Milk Tea Flavor</b></label>
+        <select id="flavor_${p.id}" class="form-input">${milkTeaFlavors.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("")}</select>
+        ${sideChoiceHtml}
+        ${friesFlavorHtml}
+      </div>`;
+    } else if(needsFlavor(p)){
+      customizationHtml=`<div style="margin-top:10px"><label><b>Flavor</b></label><select id="flavor_${p.id}" class="form-input">${getFlavors(p).map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("")}</select></div>`;
+    }
+
+    return `<div class="card">
+    <h3>${escapeHtml(p.name)}</h3>
+    <span class="badge">${escapeHtml(p.category)}</span>
+    ${customizationHtml}
+    <p class="${p.stock<=5?'low-stock':''}">Stock: ${p.stock}</p>
+    <div class="price">${money(p.price)}</div>
+    <button class="add-btn" onclick="addProductToCart(${p.id})" ${p.stock<=0?'disabled':''}>${p.stock<=0?'OUT OF STOCK':'ADD ORDER'}</button>
+    </div>`;
+  }).join("");
   }
+
+  function toggleComboFriesFlavor(id){
+    const sSel=document.getElementById("side_"+id);
+    const box=document.getElementById("sideFlavorBox_"+id);
+    if(box&&sSel){
+      box.style.display=(sSel.value==="Fresh Fries")?"block":"none";
+    }
+  }
+
   function needsFlavor(product){return product.category==="Milk Tea"||product.name.toLowerCase().includes("milk tea")||product.name.toLowerCase().includes("fries");}
   function getFlavors(product){
   if(product.category==="Milk Tea"||product.name.toLowerCase().includes("milk tea"))return["Strawberry","Cookies & Cream","Matcha","Milk Chocolate","Red Velvet","Salted Caramel","Java Chips"];
   if(product.name.toLowerCase().includes("fries"))return["Sour Cream","Cheese","BBQ"];
   return[];
   }
-  function addProductToCart(productId){
-  const product=getProducts().find(x=>x.id===productId);if(!product)return;
-  let flavor="";if(needsFlavor(product)){const select=document.getElementById("flavor_"+product.id);flavor=select?select.value:"";}
-  addToCart(productId,flavor);
-  }
-  function addToCart(productId,flavor=""){
-  const p=getProducts().find(x=>x.id===productId);if(!p)return;
-  const displayName=flavor?`${p.name} – ${flavor}`:p.name;
-  const existing=cart.find(x=>x.productId===productId&&x.flavor===flavor);
-  const qty=existing?existing.quantity:0;
-  if(qty>=p.stock){alert("Not enough stock for "+displayName+".");return;}
-  if(existing)existing.quantity++;
-  else cart.push({productId:p.id,name:displayName,productName:p.name,flavor:flavor,price:p.price,quantity:1});
-  renderCart();
+
+  function getCartUsageForProduct(prodName){
+    let count=0;
+    cart.forEach(item=>{
+      if((item.productName||"").toLowerCase()===prodName.toLowerCase()){
+        count+=item.quantity;
+      }
+      if(item.comboComponents){
+        item.comboComponents.forEach(c=>{
+          if((c.productName||"").toLowerCase()===prodName.toLowerCase()){
+            count+=c.qty*item.quantity;
+          }
+        });
+      }
+    });
+    return count;
   }
 
-  function addLaunchPromo(){
-  const product=getProducts().find(x=>x.id===1);
-  if(!product){alert("12oz Milk Tea product was not found.");return;}
-  if(product.stock<3){alert("Not enough 12oz Milk Tea stock.\n\nThe promo requires 3 cups.");return;}
-  const existing=cart.find(x=>x.promo==="LAUNCH_PROMO");
-  if(existing){
-  if((existing.quantity+1)*3>product.stock){alert("Not enough stock for another promo.");return;}
-  existing.quantity++;
-  }else{
-  cart.push({productId:product.id,name:"LAUNCH PROMO – Buy 2 Take 1 Free",productName:product.name,flavor:"Promo",price:98,quantity:1,promo:"LAUNCH_PROMO",stockRequired:3});
+  function addProductToCart(productId){
+    const product=getProducts().find(x=>x.id===productId);if(!product)return;
+    let flavor="",sideChoice="",sideFlavor="";
+    if(isCombo(product)){
+      const fSel=document.getElementById("flavor_"+product.id);
+      flavor=fSel?fSel.value:"";
+      const sSel=document.getElementById("side_"+product.id);
+      sideChoice=sSel?sSel.value:"";
+      const sfSel=document.getElementById("sideFlavor_"+product.id);
+      sideFlavor=(sfSel&&sfSel.parentElement.style.display!=="none")?sfSel.value:"";
+    } else if(needsFlavor(product)){
+      const select=document.getElementById("flavor_"+product.id);
+      flavor=select?select.value:"";
+    }
+    addToCart(productId,flavor,sideChoice,sideFlavor);
   }
+
+  function addToCart(productId,flavor="",sideChoice="",sideFlavor=""){
+  const p=getProducts().find(x=>x.id===productId);if(!p)return;
+  const components=isCombo(p)?getComboComponents(p,sideChoice):[];
+
+  let displayName=p.name;
+  if(isCombo(p)){
+    const details=[];
+    if(flavor)details.push("Tea: "+flavor);
+    if(sideChoice)details.push("Side: "+sideChoice);
+    if(sideFlavor)details.push("Fries: "+sideFlavor);
+    if(details.length)displayName+=` (${details.join(" | ")})`;
+  } else if(flavor){
+    displayName+=` – ${flavor}`;
+  }
+
+  const existing=cart.find(x=>x.productId===productId&&x.flavor===flavor&&x.sideChoice===sideChoice&&x.sideFlavor===sideFlavor);
+
+  // Check main product stock
+  const currentUsage=getCartUsageForProduct(p.name);
+  if(currentUsage+1>p.stock){
+    alert("Not enough stock for "+p.name+".");
+    return;
+  }
+  // Check component stock
+  for(const c of components){
+    const compProd=getProducts().find(x=>x.name.toLowerCase()===c.productName.toLowerCase());
+    if(compProd){
+      const compUsage=getCartUsageForProduct(compProd.name);
+      if(compUsage+c.qty>compProd.stock){
+        alert("Not enough stock for "+compProd.name+" (component of "+p.name+").");
+        return;
+      }
+    }
+  }
+
+  if(existing)existing.quantity++;
+  else cart.push({productId:p.id,name:displayName,productName:p.name,flavor:flavor,sideChoice:sideChoice,sideFlavor:sideFlavor,price:p.price,quantity:1,comboComponents:components});
   renderCart();
   }
 
   function increaseQty(i){
   const item=cart[i],p=getProducts().find(x=>x.id===item.productId);if(!p)return;
-  const required=item.promo==="LAUNCH_PROMO"?(item.quantity+1)*3:item.quantity+1;
-  if(required>p.stock){alert("Not enough stock.");return;}
+  const currentUsage=getCartUsageForProduct(p.name);
+  if(currentUsage+1>p.stock){alert("Not enough stock for "+p.name+".");return;}
+  if(item.comboComponents){
+    for(const c of item.comboComponents){
+      const compProd=getProducts().find(x=>x.name.toLowerCase()===c.productName.toLowerCase());
+      if(compProd){
+        const compUsage=getCartUsageForProduct(compProd.name);
+        if(compUsage+c.qty>compProd.stock){
+          alert("Not enough stock for component "+compProd.name+".");
+          return;
+        }
+      }
+    }
+  }
   item.quantity++;renderCart();
   }
   function decreaseQty(i){cart[i].quantity--;if(cart[i].quantity<=0)cart.splice(i,1);renderCart();}
@@ -363,17 +465,30 @@
   if(cash<total){alert("Insufficient cash payment.");return;}
   }
   const products=getProducts();
-  for(const item of cart){
-  const p=products.find(x=>x.id===item.productId);
-  const required=item.promo==="LAUNCH_PROMO"?item.quantity*3:item.quantity;
-  if(!p||p.stock<required){alert("Insufficient stock for "+item.name+".");return;}
+  const neededPerProduct={};
+  cart.forEach(item=>{
+    neededPerProduct[item.productName]=(neededPerProduct[item.productName]||0)+item.quantity;
+    if(item.comboComponents){
+      item.comboComponents.forEach(c=>{
+        neededPerProduct[c.productName]=(neededPerProduct[c.productName]||0)+(c.qty*item.quantity);
+      });
+    }
+  });
+
+  for(const [pName,qtyNeeded] of Object.entries(neededPerProduct)){
+    const p=products.find(x=>x.name.toLowerCase()===pName.toLowerCase());
+    if(!p||p.stock<qtyNeeded){
+      alert("Insufficient stock for "+(p?p.name:pName)+" (Needs "+qtyNeeded+", available "+(p?p.stock:0)+").");
+      return;
+    }
   }
+
   if(!confirm("Confirm this order?\n\nTotal: "+money(total)+"\nPayment: "+method))return;
 
-  cart.forEach(item=>{
-  const p=products.find(x=>x.id===item.productId);
-  if(p)p.stock-=item.promo==="LAUNCH_PROMO"?item.quantity*3:item.quantity;
-  });
+  for(const [pName,qtyNeeded] of Object.entries(neededPerProduct)){
+    const p=products.find(x=>x.name.toLowerCase()===pName.toLowerCase());
+    if(p)p.stock-=qtyNeeded;
+  }
   saveProducts(products);
 
   const now=new Date().toLocaleString();
@@ -404,10 +519,25 @@
   const orders=getOrders(),o=orders.find(x=>x.id===selectedVoidOrderId);
   if(!o||o.status==="VOIDED"){closeVoidModal();return;}
   const products=getProducts();
+  const returnPerProduct={};
   o.items.forEach(item=>{
-  const p=products.find(x=>x.id===item.productId);
-  if(p)p.stock+=item.promo==="LAUNCH_PROMO"?item.quantity*3:item.quantity;
+    returnPerProduct[item.productName]=(returnPerProduct[item.productName]||0)+item.quantity;
+    if(item.comboComponents){
+      item.comboComponents.forEach(c=>{
+        returnPerProduct[c.productName]=(returnPerProduct[c.productName]||0)+(c.qty*item.quantity);
+      });
+    } else if(isComboName(item.productName||item.name)){
+      const legacyComps=getComboComponents({name:item.productName||item.name,id:item.productId},item.sideChoice);
+      legacyComps.forEach(c=>{
+        returnPerProduct[c.productName]=(returnPerProduct[c.productName]||0)+(c.qty*item.quantity);
+      });
+    }
   });
+
+  for(const [pName,qtyReturn] of Object.entries(returnPerProduct)){
+    const p=products.find(x=>x.name.toLowerCase()===pName.toLowerCase());
+    if(p)p.stock+=qtyReturn;
+  }
   saveProducts(products);
   o.status="VOIDED";o.voidReason=reason;o.voidedAt=new Date().toLocaleString();saveOrders(orders);
   closeVoidModal();renderHistory();renderPOS();renderInventory();renderSales();
@@ -563,10 +693,48 @@
   }
 
   function getCupUsed(size){
-    let used=0; getOrders().forEach(o=>{if(!isActiveOrder(o))return;o.items.forEach(i=>{const n=i.productName||i.name;const m=n.match(/^(12oz|16oz|22oz)/i);if(m&&m[1].toLowerCase()===size.toLowerCase())used+=i.promo==="LAUNCH_PROMO"?i.quantity*3:i.quantity;});});return used;
+    let used=0;
+    getOrders().forEach(o=>{
+      if(!isActiveOrder(o))return;
+      o.items.forEach(i=>{
+        const n=i.productName||i.name;
+        const m=n.match(/^(12oz|16oz|22oz)/i);
+        if(m&&m[1].toLowerCase()===size.toLowerCase()){
+          used+=i.quantity;
+        } else if(size.toLowerCase()==="12oz"){
+          if(i.comboComponents){
+            i.comboComponents.forEach(c=>{
+              if(c.productName.toLowerCase().includes("12oz"))used+=c.qty*i.quantity;
+            });
+          } else if(isComboName(n)){
+            used+=i.quantity;
+          }
+        }
+      });
+    });
+    return used;
   }
   function getProductUsed(name){
-    let used=0;getOrders().forEach(o=>{if(!isActiveOrder(o))return;o.items.forEach(i=>{if((i.productName||"").toLowerCase()===name.toLowerCase())used+=i.quantity;});});return used;
+    let used=0;
+    getOrders().forEach(o=>{
+      if(!isActiveOrder(o))return;
+      o.items.forEach(i=>{
+        const prodName=i.productName||i.name;
+        if(prodName.toLowerCase()===name.toLowerCase()){
+          used+=i.quantity;
+        } else if(i.comboComponents){
+          i.comboComponents.forEach(c=>{
+            if(c.productName.toLowerCase()===name.toLowerCase())used+=c.qty*i.quantity;
+          });
+        } else if(isComboName(prodName)){
+          const legacyComps=getComboComponents({name:prodName,id:i.productId},i.sideChoice);
+          legacyComps.forEach(c=>{
+            if(c.productName.toLowerCase()===name.toLowerCase())used+=c.qty*i.quantity;
+          });
+        }
+      });
+    });
+    return used;
   }
   function editCupPurchase(size){
     const c=getCups();
