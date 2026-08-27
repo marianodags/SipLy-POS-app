@@ -74,12 +74,14 @@
   <button id="tabSales" onclick="showTab('sales')">📊 Sales</button>
   <button id="tabHistory" onclick="showTab('history')">📋 Order History</button>
   <button id="tabInventory" onclick="showTab('inventory')">📦 Inventory</button>
+  <button id="tabPromos" onclick="showTab('promos')">🎁 Promos</button>
   <button id="tabExpenses" onclick="showTab('expenses')">💸 Expenses</button>
   <button id="tabBackup" onclick="showTab('backup')">💾 Backup</button>
 </nav>
 
 <main>
   <section id="order">
+    <div id="posPromos"></div>
     <div class="order-layout">
       <div>
         <h2 class="section-title">🥤 Products</h2>
@@ -166,6 +168,14 @@
     <div id="inventoryBox"></div>
   </section>
 
+  <section id="promos" style="display:none">
+    <div class="inventory-toolbar">
+      <h2 class="section-title" style="margin:0">🎁 Dynamic Promos</h2>
+      <button class="btn btn-success" onclick="openPromoModal()">➕ CREATE PROMO</button>
+    </div>
+    <div id="promosBox"></div>
+  </section>
+
   <section id="expenses" style="display:none">
     <h2 class="section-title">💸 Expenses Tracker</h2>
     <div class="card tracker-section">
@@ -217,6 +227,62 @@
   </div>
 </div>
 
+<div id="promoModal" class="modal">
+  <div class="modal-content" style="max-width:580px;max-height:90vh;overflow-y:auto">
+    <h2 id="promoModalTitle">🎁 Create Promo</h2>
+    <input type="hidden" id="promoId">
+    <label><b>Promo Title *</b></label>
+    <input id="promoTitle" class="form-input" placeholder="e.g. Buy 2 Take 1 12oz Milk Tea">
+    <br><br>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div>
+        <label><b>Promo Type</b></label>
+        <select id="promoType" class="form-input">
+          <option value="Buy X Get Y">Buy X Get Y</option>
+          <option value="Bundle/Combo">Bundle/Combo</option>
+          <option value="Fixed Promo Price">Fixed Promo Price</option>
+          <option value="Discount">Discount</option>
+          <option value="Product-Specific">Product-Specific Promo</option>
+        </select>
+      </div>
+      <div>
+        <label><b>Selling Price *</b></label>
+        <input type="number" id="promoPrice" class="form-input" min="0" step="0.01" placeholder="98.00">
+      </div>
+    </div>
+    <br>
+    <label><b>Badge / Caption</b></label>
+    <input id="promoCaption" class="form-input" placeholder="e.g. 12oz MILK TEA SPECIAL">
+    <br><br>
+    <label><b>Description</b></label>
+    <textarea id="promoDescription" class="form-input" rows="2" placeholder="e.g. Buy 2 12oz Milk Teas for ₱98 and get 1 free!"></textarea>
+    <br><br>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div>
+        <label><b>Start Date</b></label>
+        <input type="date" id="promoStartDate" class="form-input">
+      </div>
+      <div>
+        <label><b>End Date</b></label>
+        <input type="date" id="promoEndDate" class="form-input">
+      </div>
+    </div>
+    <br>
+    <label><b>Promo Image URL (Optional)</b></label>
+    <input id="promoImage" class="form-input" placeholder="https://example.com/promo.png">
+    <br><br>
+    <label><b>Included Products &amp; Quantities *</b></label>
+    <div id="promoItemsRows" style="margin-top:8px"></div>
+    <button class="btn btn-secondary" style="margin-top:6px;width:100%" onclick="addPromoItemRow()">➕ Add Included Product</button>
+    <br><br>
+    <label><input type="checkbox" id="promoActive" checked> <b>Active in POS Order Screen</b></label>
+    <div class="modal-buttons">
+      <button class="btn btn-secondary" onclick="closePromoModal()">CANCEL</button>
+      <button class="btn btn-success" onclick="savePromo()">SAVE PROMO</button>
+    </div>
+  </div>
+</div>
+
 <div id="voidModal" class="modal">
   <div class="modal-content">
     <h2>⚠️ Void Order</h2>
@@ -236,6 +302,7 @@
   const EXPENSES_KEY="siply_expenses_v1";
   const CUPS_KEY="siply_cups_v1";
   const PURCHASES_KEY="siply_purchases_v1";
+  const PROMOS_KEY="siply_promos_v1";
   let cart=[];
   let selectedVoidOrderId=null;
 
@@ -262,6 +329,24 @@
   function saveCups(x){localStorage.setItem(CUPS_KEY,JSON.stringify(x));}
   function getPurchases(){return JSON.parse(localStorage.getItem(PURCHASES_KEY)||'{}');}
   function savePurchases(x){localStorage.setItem(PURCHASES_KEY,JSON.stringify(x));}
+
+  function getPromos(){
+    let p=JSON.parse(localStorage.getItem(PROMOS_KEY));
+    if(!p){
+      p=[{
+        id:101,
+        title:"Buy 2, Take 1 Free 12oz Milk Tea",
+        caption:"12oz MILK TEA SPECIAL",
+        description:"Buy 2 12oz Milk Teas for ₱98 and get 1 free! Save ₱49.",
+        price:98,
+        active:true,
+        items:[{productName:"12oz Milk Tea",quantity:3}]
+      }];
+      savePromos(p);
+    }
+    return p;
+  }
+  function savePromos(p){localStorage.setItem(PROMOS_KEY,JSON.stringify(p));}
   function isActiveOrder(o){return o.status!=="VOIDED";}
   function money(n){return "₱"+Number(n).toFixed(2);}
   function escapeHtml(v){return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}
@@ -467,7 +552,9 @@
   const products=getProducts();
   const neededPerProduct={};
   cart.forEach(item=>{
-    neededPerProduct[item.productName]=(neededPerProduct[item.productName]||0)+item.quantity;
+    if(!item.isPromo){
+      neededPerProduct[item.productName]=(neededPerProduct[item.productName]||0)+item.quantity;
+    }
     if(item.comboComponents){
       item.comboComponents.forEach(c=>{
         neededPerProduct[c.productName]=(neededPerProduct[c.productName]||0)+(c.qty*item.quantity);
@@ -497,7 +584,7 @@
 
   alert("ORDER CONFIRMED!\n\nOrder #: "+order.orderNumber+"\nTotal: "+money(total)+"\nStatus: PREPARING");
   cart=[];document.getElementById("cashReceived").value="";document.getElementById("gcashReference").value="";
-  renderCart();renderPOS();renderInventory();renderSales();
+  renderCart();renderPOS();renderPOSPromos();renderInventory();renderSales();
   }
 
   function statusBadge(status){const cls={PREPARING:"status-preparing",READY:"status-ready",RECEIVED:"status-received",VOIDED:"status-voided"}[status]||"";return `<span class="status ${cls}">${status}</span>`;}
@@ -521,7 +608,9 @@
   const products=getProducts();
   const returnPerProduct={};
   o.items.forEach(item=>{
-    returnPerProduct[item.productName]=(returnPerProduct[item.productName]||0)+item.quantity;
+    if(!item.isPromo){
+      returnPerProduct[item.productName]=(returnPerProduct[item.productName]||0)+item.quantity;
+    }
     if(item.comboComponents){
       item.comboComponents.forEach(c=>{
         returnPerProduct[c.productName]=(returnPerProduct[c.productName]||0)+(c.qty*item.quantity);
@@ -540,7 +629,7 @@
   }
   saveProducts(products);
   o.status="VOIDED";o.voidReason=reason;o.voidedAt=new Date().toLocaleString();saveOrders(orders);
-  closeVoidModal();renderHistory();renderPOS();renderInventory();renderSales();
+  closeVoidModal();renderHistory();renderPOS();renderPOSPromos();renderInventory();renderSales();
   alert("Order #"+o.orderNumber+" has been VOIDED and stock was returned.");
   }
 
@@ -797,8 +886,241 @@
   function xmlCell(v){return `<Cell><Data ss:Type="${typeof v==="number"&&!isNaN(v)?"Number":"String"}">${xmlEsc(v==null?"":v)}</Data></Cell>`;}
   function xmlRow(vals){return "<Row>"+vals.map(xmlCell).join("")+"</Row>";}
   function xmlSheet(name,headers,rows){return `<Worksheet ss:Name="${xmlEsc(name)}"><Table>${xmlRow(headers)}${rows.map(r=>xmlRow(r)).join("")}</Table></Worksheet>`;}
+  function getPromoMaxAvailable(promo){
+    const products=getProducts();
+    if(!promo.items||!promo.items.length)return 0;
+    let minAvail=Infinity;
+    promo.items.forEach(item=>{
+      const p=products.find(x=>x.name.toLowerCase()===item.productName.toLowerCase());
+      const stock=p?p.stock:0;
+      const req=item.quantity||1;
+      const currentUsage=getCartUsageForProduct(item.productName);
+      const availStock=Math.max(0,stock-currentUsage);
+      const availPromos=Math.floor(availStock/req);
+      if(availPromos<minAvail)minAvail=availPromos;
+    });
+    return minAvail===Infinity?0:minAvail;
+  }
+
+  function renderPOSPromos(){
+    const box=document.getElementById("posPromos");
+    if(!box)return;
+    const todayStr=new Date().toISOString().slice(0,10);
+    const activePromos=getPromos().filter(p=>{
+      if(p.active===false)return false;
+      if(p.startDate&&p.startDate>todayStr)return false;
+      if(p.endDate&&p.endDate<todayStr)return false;
+      return true;
+    });
+    if(!activePromos.length){box.innerHTML="";return;}
+    box.innerHTML=activePromos.map(p=>{
+      const maxAvail=getPromoMaxAvailable(p);
+      const isAvail=maxAvail>0;
+      return `
+      <div class="card" style="background:#fffdf5;border:2px solid var(--orange);margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            ${p.image?`<img src="${escapeHtml(p.image)}" style="max-height:80px;border-radius:8px;margin-bottom:6px"><br>`:""}
+            <span class="badge" style="background:var(--orange);color:#fff">${escapeHtml(p.caption||"PROMO DEAL")}</span>
+            <span class="badge">${escapeHtml(p.type||"Promo")}</span>
+            <h3 style="margin:6px 0 2px">${escapeHtml(p.title)}</h3>
+            <p style="margin:2px 0 6px;font-size:14px;color:#555">${escapeHtml(p.description||"")}</p>
+            <small><b>Includes:</b> ${p.items.map(i=>`${i.quantity}× ${escapeHtml(i.productName)}`).join(", ")}</small><br>
+            ${isAvail?`<small style="color:var(--green-dark)"><b>Max Available:</b> ${maxAvail} promo(s)</small>`:`<div class="low-stock" style="margin-top:4px">⚠️ This promo is currently unavailable because one or more included products are out of stock.</div>`}
+          </div>
+          <div style="text-align:right">
+            <div class="price">${money(p.price)}</div>
+            ${isAvail?`<button class="btn btn-danger" style="margin-top:6px" onclick="addPromoToCart(${p.id})">🎁 AVAIL PROMO</button>`:`<button class="btn btn-secondary" style="margin-top:6px" disabled>OUT OF STOCK</button>`}
+          </div>
+        </div>
+      </div>
+    `}).join("");
+  }
+
+  function renderPromos(){
+    const box=document.getElementById("promosBox");
+    if(!box)return;
+    const promos=getPromos();
+    if(!promos.length){box.innerHTML='<div class="empty">No dynamic promos created yet.<br><br><button class="btn btn-success" onclick="openPromoModal()">➕ CREATE PROMO</button></div>';return;}
+    box.innerHTML=`<div class="grid">${promos.map(p=>{
+      const maxAvail=getPromoMaxAvailable(p);
+      return `
+      <div class="card" style="border-top: 4px solid ${p.active!==false?'var(--green)':'var(--red)'}">
+        <div style="display:flex;justify-content:space-between;gap:8px">
+          <div><h3>${escapeHtml(p.title)}</h3><span class="badge">${escapeHtml(p.caption||"PROMO")}</span> <span class="badge">${escapeHtml(p.type||"Promo")}</span></div>
+          <span class="status ${p.active!==false?'status-ready':'status-voided'}">${p.active!==false?'ACTIVE':'INACTIVE'}</span>
+        </div>
+        <hr>
+        <p style="font-size:13px;color:#666">${escapeHtml(p.description||"")}</p>
+        <div class="total-line"><span>Price</span><b>${money(p.price)}</b></div>
+        <div class="total-line"><span>Max Avail</span><b class="${maxAvail<=0?'low-stock':''}">${maxAvail}</b></div>
+        ${p.startDate||p.endDate?`<div class="total-line"><span>Validity</span><small>${escapeHtml(p.startDate||"Always")} to ${escapeHtml(p.endDate||"Always")}</small></div>`:""}
+        <div class="notice"><b>Included Products:</b><br>${p.items.map(i=>`• ${i.quantity}× ${escapeHtml(i.productName)}`).join("<br>")}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+          <button class="btn btn-secondary" onclick="togglePromoActive(${p.id})">${p.active!==false?'DISABLE':'ENABLE'}</button>
+          <button class="btn btn-success" onclick="editPromo(${p.id})">✏️ EDIT</button>
+        </div>
+        <button class="btn btn-danger" style="width:100%;margin-top:6px" onclick="deletePromo(${p.id})">🗑️ DELETE PROMO</button>
+      </div>
+    `}).join("")}</div>`;
+  }
+
+  function openPromoModal(id=null){
+    document.getElementById("promoId").value=id||"";
+    document.getElementById("promoModalTitle").textContent=id?"✏️ Edit Promo":"🎁 Create Promo";
+    document.getElementById("promoItemsRows").innerHTML="";
+    if(id){
+      const p=getPromos().find(x=>x.id===id);
+      if(p){
+        document.getElementById("promoTitle").value=p.title||"";
+        document.getElementById("promoType").value=p.type||"Buy X Get Y";
+        document.getElementById("promoCaption").value=p.caption||"";
+        document.getElementById("promoDescription").value=p.description||"";
+        document.getElementById("promoPrice").value=p.price||"";
+        document.getElementById("promoStartDate").value=p.startDate||"";
+        document.getElementById("promoEndDate").value=p.endDate||"";
+        document.getElementById("promoImage").value=p.image||"";
+        document.getElementById("promoActive").checked=p.active!==false;
+        p.items.forEach(item=>addPromoItemRow(item.productName,item.quantity));
+      }
+    }else{
+      document.getElementById("promoTitle").value="";
+      document.getElementById("promoType").value="Buy X Get Y";
+      document.getElementById("promoCaption").value="";
+      document.getElementById("promoDescription").value="";
+      document.getElementById("promoPrice").value="";
+      document.getElementById("promoStartDate").value="";
+      document.getElementById("promoEndDate").value="";
+      document.getElementById("promoImage").value="";
+      document.getElementById("promoActive").checked=true;
+      addPromoItemRow();
+    }
+    document.getElementById("promoModal").style.display="flex";
+  }
+  function closePromoModal(){document.getElementById("promoModal").style.display="none";}
+
+  function addPromoItemRow(selectedProd="",qty=1){
+    const container=document.getElementById("promoItemsRows");
+    const rowId="promoRow_"+Date.now()+"_"+Math.floor(Math.random()*1000);
+    const products=getProducts();
+    const row=document.createElement("div");
+    row.id=rowId;
+    row.className="expense-form";
+    row.style.marginBottom="6px";
+    row.innerHTML=`
+      <select class="form-input promo-prod-name">
+        ${products.map(p=>`<option value="${escapeHtml(p.name)}" ${p.name.toLowerCase()===selectedProd.toLowerCase()?'selected':''}>${escapeHtml(p.name)} (${p.category})</option>`).join("")}
+      </select>
+      <input type="number" class="form-input promo-prod-qty" min="1" step="1" value="${qty}">
+      <button class="btn btn-danger" onclick="document.getElementById('${rowId}').remove()">✕</button>
+    `;
+    container.appendChild(row);
+  }
+
+  function savePromo(){
+    const id=document.getElementById("promoId").value;
+    const title=document.getElementById("promoTitle").value.trim();
+    const type=document.getElementById("promoType").value;
+    const caption=document.getElementById("promoCaption").value.trim();
+    const description=document.getElementById("promoDescription").value.trim();
+    const price=parseFloat(document.getElementById("promoPrice").value);
+    const startDate=document.getElementById("promoStartDate").value;
+    const endDate=document.getElementById("promoEndDate").value;
+    const image=document.getElementById("promoImage").value.trim();
+    const active=document.getElementById("promoActive").checked;
+
+    if(!title){alert("Promo title is required.");return;}
+    if(isNaN(price)||price<0){alert("Enter a valid price.");return;}
+
+    const itemRows=document.querySelectorAll("#promoItemsRows .expense-form");
+    const items=[];
+    itemRows.forEach(row=>{
+      const pName=row.querySelector(".promo-prod-name").value;
+      const pQty=parseInt(row.querySelector(".promo-prod-qty").value)||1;
+      if(pName&&pQty>0){
+        items.push({productName:pName,quantity:pQty});
+      }
+    });
+
+    if(!items.length){alert("Please add at least one included product for this promo.");return;}
+
+    let promos=getPromos();
+    if(id){
+      const p=promos.find(x=>x.id===Number(id));
+      if(p){
+        p.title=title;p.type=type;p.caption=caption;p.description=description;p.price=price;p.startDate=startDate;p.endDate=endDate;p.image=image;p.active=active;p.items=items;
+      }
+    }else{
+      promos.push({id:Date.now(),title,type,caption,description,price,startDate,endDate,image,active,items});
+    }
+    savePromos(promos);
+    closePromoModal();
+    renderPromos();
+    renderPOSPromos();
+    alert("Promo saved successfully!");
+  }
+
+  function editPromo(id){openPromoModal(id);}
+  function togglePromoActive(id){
+    const promos=getPromos(),p=promos.find(x=>x.id===id);
+    if(p){p.active=!(p.active!==false);savePromos(promos);renderPromos();renderPOSPromos();}
+  }
+  function deletePromo(id){
+    if(!confirm("Delete this promo?"))return;
+    savePromos(getPromos().filter(x=>x.id!==id));
+    renderPromos();
+    renderPOSPromos();
+  }
+
+  function addPromoToCart(promoId){
+    const promo=getPromos().find(x=>x.id===promoId);
+    if(!promo)return;
+    const components=promo.items.map(i=>({productName:i.productName,qty:i.quantity}));
+
+    for(const c of components){
+      const compProd=getProducts().find(x=>x.name.toLowerCase()===c.productName.toLowerCase());
+      if(compProd){
+        const compUsage=getCartUsageForProduct(compProd.name);
+        if(compUsage+c.qty>compProd.stock){
+          alert("Not enough stock for "+compProd.name+" required by promo ("+promo.title+").");
+          return;
+        }
+      }else{
+        alert("Product "+c.productName+" included in promo was not found in inventory.");
+        return;
+      }
+    }
+
+    const existing=cart.find(x=>x.promoId===promoId);
+    if(existing){
+      for(const c of components){
+        const compProd=getProducts().find(x=>x.name.toLowerCase()===c.productName.toLowerCase());
+        if(compProd){
+          const compUsage=getCartUsageForProduct(compProd.name);
+          if(compUsage+c.qty>compProd.stock){
+            alert("Not enough stock for "+compProd.name+" for another promo unit.");
+            return;
+          }
+        }
+      }
+      existing.quantity++;
+    }else{
+      cart.push({
+        promoId:promo.id,
+        productId:Date.now(),
+        name:promo.title,
+        productName:promo.title,
+        price:promo.price,
+        quantity:1,
+        isPromo:true,
+        comboComponents:components
+      });
+    }
+    renderCart();
+  }
+
   function buildExcelBackup(){
-    const products=getProducts(),orders=getOrders(),expenses=getExpenses(),cups=getCups(),purchases=getPurchases();
+    const products=getProducts(),orders=getOrders(),expenses=getExpenses(),cups=getCups(),purchases=getPurchases(),promos=getPromos();
     return `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
     ${xmlSheet("Products",["id","name","category","price","stock"],products.map(p=>[p.id,p.name,p.category,p.price,p.stock]))}
     ${xmlSheet("Orders",["id","orderNumber","total","paymentMethod","cashReceived","gcashReference","status","createdAt","voidReason","voidedAt"],orders.map(o=>[o.id,o.orderNumber,o.total,o.paymentMethod,o.cashReceived,o.gcashReference,o.status,o.createdAt,o.voidReason,o.voidedAt||""]))}
@@ -806,6 +1128,8 @@
     ${xmlSheet("Expenses",["id","description","amount","createdAt"],expenses.map(e=>[e.id,e.description,e.amount,e.createdAt]))}
     ${xmlSheet("Cups",["size","bought"],Object.entries(cups).map(([k,v])=>[k,v.bought||0]))}
     ${xmlSheet("ProductPurchases",["product","bought"],Object.entries(purchases).map(([k,v])=>[k,v]))}
+    ${xmlSheet("Promos",["id","title","type","caption","description","price","startDate","endDate","image","active"],promos.map(p=>[p.id,p.title,p.type||"Buy X Get Y",p.caption||"",p.description||"",p.price,p.startDate||"",p.endDate||"",p.image||"",p.active!==false?1:0]))}
+    ${xmlSheet("PromoItems",["promoId","productName","quantity"],promos.flatMap(p=>p.items.map(i=>[p.id,i.productName,i.quantity])))}
     </Workbook>`;
   }
   function exportExcelBackup(){
@@ -833,10 +1157,23 @@
       const products=rowObjs("Products").map(p=>({...p,id:Number(p.id),price:Number(p.price),stock:Number(p.stock)}));
       const ordersRaw=rowObjs("Orders"),items=rowObjs("OrderItems");const orders=ordersRaw.map(o=>({...o,id:Number(o.id),total:Number(o.total),cashReceived:Number(o.cashReceived||0),items:items.filter(i=>Number(i.orderId)===Number(o.id)).map(i=>({...i,orderId:undefined,productId:Number(i.productId),price:Number(i.price),quantity:Number(i.quantity),promo:i.promo||undefined}))}));
       const expenses=rowObjs("Expenses").map(e=>({...e,id:Number(e.id),amount:Number(e.amount)}));const cups={};rowObjs("Cups").forEach(x=>cups[x.size]={bought:Number(x.bought||0)});const purchases={};rowObjs("ProductPurchases").forEach(x=>purchases[x.product]=Number(x.bought||0));
+      const promosRaw=rowObjs("Promos"),promoItemsRaw=rowObjs("PromoItems");
+      if(promosRaw.length){
+        const restoredPromos=promosRaw.map(p=>({
+          id:Number(p.id),
+          title:String(p.title),
+          caption:String(p.caption||""),
+          description:String(p.description||""),
+          price:Number(p.price),
+          active:Number(p.active)!==0,
+          items:promoItemsRaw.filter(i=>Number(i.promoId)===Number(p.id)).map(i=>({productName:String(i.productName),quantity:Number(i.quantity)}))
+        }));
+        savePromos(restoredPromos);
+      }
       if(!products.length&&!orders.length&&!expenses.length)throw new Error("Backup appears empty.");
       if(!confirm("Restore this backup? Current POS data will be replaced."))return;
       saveProducts(products);saveOrders(orders);saveExpenses(expenses);saveCups(cups);savePurchases(purchases);
-      renderPOS();renderCart();renderSales();renderHistory();renderInventory();renderExpenseSummary();document.getElementById("backupStatus").textContent="Backup restored successfully.";
+      renderPOS();renderPOSPromos();renderCart();renderSales();renderHistory();renderInventory();renderPromos();renderExpenseSummary();document.getElementById("backupStatus").textContent="Backup restored successfully.";
     }catch(err){alert("Restore failed: "+err.message);}
   }
   window.androidImportBackup=function(text){restoreExcelBackupText(text);};
@@ -846,14 +1183,15 @@
   document.getElementById("sales").style.display=tab==="sales"?"block":"none";
   document.getElementById("history").style.display=tab==="history"?"block":"none";
   document.getElementById("inventory").style.display=tab==="inventory"?"block":"none";
+  document.getElementById("promos").style.display=tab==="promos"?"block":"none";
   document.getElementById("expenses").style.display=tab==="expenses"?"block":"none";
   document.getElementById("backup").style.display=tab==="backup"?"block":"none";
-  ["tabOrder","tabSales","tabHistory","tabInventory","tabExpenses","tabBackup"].forEach(id=>document.getElementById(id).classList.remove("active"));
+  ["tabOrder","tabSales","tabHistory","tabInventory","tabPromos","tabExpenses","tabBackup"].forEach(id=>document.getElementById(id).classList.remove("active"));
   document.getElementById("tab"+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add("active");
-  if(tab==="sales")renderSales();if(tab==="history")renderHistory();if(tab==="inventory")renderInventory();if(tab==="expenses")renderExpenseSummary();
+  if(tab==="sales")renderSales();if(tab==="history")renderHistory();if(tab==="inventory")renderInventory();if(tab==="promos")renderPromos();if(tab==="expenses")renderExpenseSummary();
   }
 
-  getProducts();renderPOS();renderCart();renderSales();renderHistory();renderInventory();renderExpenseSummary();updatePaymentFields();
+  getProducts();getPromos();renderPOS();renderPOSPromos();renderCart();renderSales();renderHistory();renderInventory();renderPromos();renderExpenseSummary();updatePaymentFields();
 </script>
 </body>
 </html>
